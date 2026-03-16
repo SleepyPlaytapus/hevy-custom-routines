@@ -1,20 +1,20 @@
 // ==UserScript==
 // @name         Hevy Manager
-// @namespace    https://github.com/YOUR_NICK/hevy-manager
+// @namespace    https://github.com/SleepyPlaytapus/hevy-manager
 // @version      1.0.0
 // @description  Manage Hevy routines without Pro — import, edit, create from text or AI, sync back to Hevy
-// @author       YOUR_NICK
+// @author       SleepyPlaytapus
 // @match        https://hevy.com/*
 // @grant        GM_xmlhttpRequest
 // @connect      api.hevyapp.com
 // @connect      hevy.com
 // @run-at       document-start
 // @license      MIT
-// @homepageURL  https://github.com/YOUR_NICK/hevy-manager
-// @supportURL   https://github.com/YOUR_NICK/hevy-manager/issues
-// @updateURL    https://raw.githubusercontent.com/YOUR_NICK/hevy-manager/main/hevy_manager.user.js
-// @downloadURL  https://raw.githubusercontent.com/YOUR_NICK/hevy-manager/main/hevy_manager.user.js
-// @require      https://raw.githubusercontent.com/YOUR_NICK/hevy-manager/main/hevy_exercises.js
+// @homepageURL  https://github.com/SleepyPlaytapus/hevy-manager
+// @supportURL   https://github.com/SleepyPlaytapus/hevy-manager/issues
+// @updateURL    https://raw.githubusercontent.com/SleepyPlaytapus/hevy-manager/main/hevy_manager.user.js
+// @downloadURL  https://raw.githubusercontent.com/SleepyPlaytapus/hevy-manager/main/hevy_manager.user.js
+// @require      https://raw.githubusercontent.com/SleepyPlaytapus/hevy-manager/main/hevy_exercises.js
 // ==/UserScript==
 
 (function () {
