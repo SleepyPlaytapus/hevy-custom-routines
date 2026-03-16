@@ -1,3 +1,7 @@
+// Hevy Manager — Exercise Database
+// https://github.com/YOUR_NICK/hevy-manager
+// Do not edit manually — see README for how to update
+
 const HEVY_EXERCISES = [
   {id:'3BC06AD3',title:'21s Bicep Curl'},
   {id:'99D5F10E',title:'Ab Wheel'},
