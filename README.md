@@ -18,6 +18,9 @@ Import your existing routines, create new ones manually or from text, edit them,
 - 425+ exercises built-in, no manual setup required
 
 ---
+<video src="https://github.com/user-attachments/assets/25f34582-1584-44a9-b56f-fad420c4c995" controls width="100%" autoplay loop muted></video>
+---
+
 
 ## Installation
 
