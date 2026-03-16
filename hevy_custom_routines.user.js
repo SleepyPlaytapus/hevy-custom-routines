@@ -1,4 +1,4 @@
-// ==UserScript==
+    // ==UserScript==
 // @name         Hevy Manager
 // @namespace    https://github.com/SleepyPlaytapus/hevy-manager
 // @version      1.0.0
@@ -14,7 +14,7 @@
 // @supportURL   https://github.com/SleepyPlaytapus/hevy-manager/issues
 // @updateURL    https://raw.githubusercontent.com/SleepyPlaytapus/hevy-manager/main/hevy_manager.user.js
 // @downloadURL  https://raw.githubusercontent.com/SleepyPlaytapus/hevy-manager/main/hevy_manager.user.js
-// @require      https://raw.githubusercontent.com/SleepyPlaytapus/hevy-manager/main/hevy_exercises.js
+// @require      https://raw.githubusercontent.com/SleepyPlaytapus/hevy-custom-routines/main/hevy_exercises.js
 // ==/UserScript==
 
 (function () {
