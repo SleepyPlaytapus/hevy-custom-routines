@@ -1,6 +1,6 @@
-    // ==UserScript==
+// ==UserScript==
 // @name         Hevy Manager
-// @namespace    https://github.com/SleepyPlaytapus/hevy-manager
+// @namespace    https://github.com/SleepyPlaytapus/hevy-custom-routines
 // @version      1.0.0
 // @description  Manage Hevy routines without Pro — import, edit, create from text or AI, sync back to Hevy
 // @author       SleepyPlaytapus
@@ -10,10 +10,10 @@
 // @connect      hevy.com
 // @run-at       document-start
 // @license      MIT
-// @homepageURL  https://github.com/SleepyPlaytapus/hevy-manager
-// @supportURL   https://github.com/SleepyPlaytapus/hevy-manager/issues
-// @updateURL    https://raw.githubusercontent.com/SleepyPlaytapus/hevy-manager/main/hevy_manager.user.js
-// @downloadURL  https://raw.githubusercontent.com/SleepyPlaytapus/hevy-manager/main/hevy_manager.user.js
+// @homepageURL  https://github.com/SleepyPlaytapus/hevy-custom-routines
+// @supportURL   https://github.com/SleepyPlaytapus/hevy-custom-routines/issues
+// @updateURL    https://raw.githubusercontent.com/SleepyPlaytapus/hevy-custom-routines/main/hevy_custom_routines.user.js
+// @downloadURL  https://raw.githubusercontent.com/SleepyPlaytapus/hevy-custom-routines/main/hevy_custom_routines.user.js
 // @require      https://raw.githubusercontent.com/SleepyPlaytapus/hevy-custom-routines/main/hevy_exercises.js
 // ==/UserScript==
 
