@@ -29,7 +29,7 @@ Import your existing routines, create new ones manually or from text, edit them,
 
 1. Install Violentmonkey from your browser's extension store
 2. Click this link to install the script:
-   **[Install Hevy Custom Routines](https://raw.githubusercontent.com/YOUR_NICK/hevy-custom-routines/main/hevy_custom_routines.user.js)**
+   **[Install Hevy Custom Routines](https://raw.githubusercontent.com/SleepyPlaytapus/hevy-custom-routines/main/hevy_custom_routines.user.js)**
 3. Violentmonkey will show an installation dialog — click **Confirm Installation**
 4. Go to [hevy.com](https://hevy.com) — you'll see a 📋 button in the bottom-right corner
 
