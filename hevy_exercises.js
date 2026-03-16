@@ -1,5 +1,5 @@
 // Hevy Manager — Exercise Database
-// https://github.com/YOUR_NICK/hevy-manager
+// https://github.com/SleepyPlaytapus/hevy-manager
 // Do not edit manually — see README for how to update
 
 const HEVY_EXERCISES = [
