@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hevy Manager
 // @namespace    https://github.com/SleepyPlaytapus/hevy-custom-routines
-// @version      1.0.0
+// @version      1.0.1
 // @description  Manage Hevy routines without Pro — import, edit, create from text or AI, sync back to Hevy
 // @author       SleepyPlaytapus
 // @match        https://hevy.com/*
@@ -276,6 +276,39 @@
         } catch(e) { alert(`❌ ${e.message}`); }
     }
 
+    // ── Auto-link local routines to Hevy IDs from DOM ─────────────
+    async function autoLinkHevyIds() {
+        if (!capturedToken) return;
+        const uuids = [...document.querySelectorAll('[data-rbd-draggable-id]')]
+            .map(el => el.getAttribute('data-rbd-draggable-id'))
+            .filter(id => id?.includes('-'));
+        if (uuids.length === 0) return;
+
+        const rList = getSavedRoutines();
+        let changed = false;
+
+        for (const uuid of uuids) {
+            try {
+                const res = await gmFetch(`https://api.hevyapp.com/routine/${uuid}`, { headers: getHeaders() });
+                if (!res.ok) continue;
+                const rd = res.json();
+                const r = rd.routine || rd;
+                if (!r?.title) continue;
+
+                const idx = rList.findIndex(local =>
+                    local.name === r.title && !local.hevy_id
+                );
+                if (idx >= 0) {
+                    rList[idx].hevy_id = r.id;
+                    changed = true;
+                    console.log('[HCR] Linked:', r.title, '→', r.id);
+                }
+            } catch(e) {}
+        }
+
+        if (changed) { saveRoutines(rList); renderPanel(); }
+    }
+
     // ── 5. Import routines from Hevy ──────────────────────────────
     async function importRoutinesFromHevy() {
         if (!capturedToken) { alert('No token! Browse around the site first.'); return; }
@@ -439,6 +472,17 @@
         });
 
         window.addEventListener('resize', () => { if (isOpen) setPanelPosition(); });
+
+        // Watch for SPA navigation to /routines
+        let lastPath = location.pathname;
+        setInterval(() => {
+            if (location.pathname !== lastPath) {
+                lastPath = location.pathname;
+                if (location.pathname.includes('/routines') && capturedToken) {
+                    setTimeout(autoLinkHevyIds, 1500); // wait for DOM to render
+                }
+            }
+        }, 500);
     }
 
     function setPanelPosition() {
@@ -661,6 +705,7 @@
         if (existing?.index !== undefined) updated.index = existing.index;
         if (editingIndex !== null) rList[editingIndex] = updated; else rList.push(updated);
         saveRoutines(rList);
+        console.log('[HCR] Saved routines:', getSavedRoutines().length);
         document.getElementById('hcr-editor').style.display = 'none';
         renderPanel();
     }
@@ -834,6 +879,14 @@
             createPanel();
             setupExerciseClickInterceptor();
             clearInterval(interval);
+
+            // Auto-link after token is captured and we're on /routines
+            const tokenWatcher = setInterval(() => {
+                if (capturedToken) {
+                    clearInterval(tokenWatcher);
+                    if (location.href.includes('/routines')) autoLinkHevyIds();
+                }
+            }, 500);
         }
     }, 300);
 
