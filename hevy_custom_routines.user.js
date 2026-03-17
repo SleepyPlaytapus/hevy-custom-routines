@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hevy Manager
 // @namespace    https://github.com/SleepyPlaytapus/hevy-custom-routines
-// @version      1.0.2
+// @version      1.0.3
 // @description  Manage Hevy routines without Pro — import, edit, create from text or AI, sync back to Hevy
 // @author       SleepyPlaytapus
 // @match        https://hevy.com/*
@@ -15,6 +15,7 @@
 // @updateURL    https://raw.githubusercontent.com/SleepyPlaytapus/hevy-custom-routines/main/hevy_custom_routines.user.js
 // @downloadURL  https://raw.githubusercontent.com/SleepyPlaytapus/hevy-custom-routines/main/hevy_custom_routines.user.js
 // @require      https://raw.githubusercontent.com/SleepyPlaytapus/hevy-custom-routines/main/hevy_exercises.js
+// @require      https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js
 // ==/UserScript==
 
 (function () {
@@ -781,6 +782,7 @@
                         <div style="display:flex;gap:4px;flex-shrink:0">
                             <button data-edit="${r._idx}" title="Edit (GUI)" style="${iconBtn('#45475a','#cdd6f4')}">✏️</button>
                             <button data-textedit="${r._idx}" title="Edit (Text)" style="${iconBtn('#45475a','#89b4fa')}">📝</button>
+                            <button data-qr="${r._idx}" title="Show QR" style="${iconBtn('#2a2a3e','#a6adc8')}">📱</button>
                             ${syncBtn}
                             <button data-del="${r._idx}" title="Delete" style="${iconBtn('#3d2030','#f38ba8')}">🗑</button>
                         </div>
@@ -790,6 +792,7 @@
 
         list.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => showEditor(+b.dataset.edit)));
         list.querySelectorAll('[data-textedit]').forEach(b => b.addEventListener('click', () => showTextEditor(+b.dataset.textedit)));
+        list.querySelectorAll('[data-qr]').forEach(b => b.addEventListener('click', () => showQRCode(+b.dataset.qr)));
         list.querySelectorAll('[data-load]').forEach(b => b.addEventListener('click', () => pushRoutineToHevy(getSavedRoutines()[+b.dataset.load])));
         list.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
             const idx = +b.dataset.del;
@@ -826,6 +829,34 @@
             const rList = getSavedRoutines(); rList[routineIndex] = parsed;
             saveRoutines(rList); editor.style.display = 'none'; renderPanel();
         });
+    }
+
+    // ── 11.5. QR Code View ─────────────────────────────────────────
+    function showQRCode(routineIndex) {
+        const routine = getSavedRoutines()[routineIndex];
+        const text = routineToText(routine);
+        document.getElementById('hcr-list').style.display = 'none';
+        const editor = document.getElementById('hcr-editor');
+        editor.style.display = 'block';
+        editor.innerHTML = `
+            <button id="hcr-back-qr" style="${btnStyle('#45475a','#cdd6f4')}">← Back</button>
+            <div style="text-align:center; padding:20px 0;">
+                <h3 style="margin:0 0 10px 0; color:#cdd6f4;">📱 Scan Routine</h3>
+                <p style="font-size:12px; color:#a6adc8; margin-bottom:20px; line-height: 1.4;">Scan this code with your phone's camera (e.g., Google Lens / Apple Vision) to quickly copy the routine text.</p>
+                <div id="hcr-qr-container" style="display:inline-block; background:white; padding:16px; border-radius:8px;"></div>
+            </div>
+        `;
+        document.getElementById('hcr-back-qr').addEventListener('click', () => { editor.style.display = 'none'; renderPanel(); });
+        
+        try {
+            new QRCode(document.getElementById("hcr-qr-container"), {
+                text: text, width: 220, height: 220,
+                colorDark: "#000000", colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.L
+            });
+        } catch(e) {
+            document.getElementById("hcr-qr-container").innerHTML = '<div style="color:#f38ba8;font-size:12px;padding:20px">⚠️ Error generating QR code.<br>The text might be exceptionally long.</div>';
+        }
     }
 
     // ── 12. GUI Editor ─────────────────────────────────────────────
