@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hevy Manager
 // @namespace    https://github.com/SleepyPlaytapus/hevy-custom-routines
-// @version      1.0.1
+// @version      1.0.2
 // @description  Manage Hevy routines without Pro — import, edit, create from text or AI, sync back to Hevy
 // @author       SleepyPlaytapus
 // @match        https://hevy.com/*
@@ -39,6 +39,8 @@
     let isOpen = false;
     let exerciseTemplates = [];
     let activeTab = 'all';
+    const syncCache = new Map();
+    const pendingChecks = new Set();
 
     // Load exercise DB
     (function initDB() {
@@ -266,9 +268,12 @@
                         if (newId) {
                             const rList = getSavedRoutines();
                             const idx = rList.findIndex(r => r.name === routine.name && !r.hevy_id);
-                            if (idx >= 0) { rList[idx].hevy_id = newId; saveRoutines(rList); renderPanel(); }
+                            if (idx >= 0) { rList[idx].hevy_id = newId; saveRoutines(rList); syncCache.set(newId, true); renderPanel(); }
                         }
                     } catch(e) {}
+                } else {
+                    syncCache.set(routine.hevy_id, true);
+                    renderPanel();
                 }
                 alert(`✅ "${routine.name}" ${isUpdate ? 'updated' : 'added'} in Hevy!`);
             } else {
@@ -301,6 +306,7 @@
                 );
                 if (idx >= 0) {
                     rList[idx].hevy_id = r.id;
+                    syncCache.set(r.id, true);
                     changed = true;
                     console.log('[HCR] Linked:', r.title, '→', r.id);
                 }
@@ -311,7 +317,7 @@
     }
 
     // ── 5. Import routines from Hevy ──────────────────────────────
-    async function importRoutinesFromHevy() {
+    async function importRoutinesFromHevy(mode = 'prompt') {
         if (!capturedToken) { alert('No token! Browse around the site first.'); return; }
 
         const uuids = [...document.querySelectorAll('[data-rbd-draggable-id]')]
@@ -323,10 +329,34 @@
             return;
         }
 
+        const existing = getSavedRoutines();
+
+        // Show conflict resolution UI if there are already routines
+        if (existing.length > 0 && mode === 'prompt') {
+            const list = document.getElementById('hcr-list');
+            list.innerHTML = `
+                <div style="background:#252535; border:1px solid #45475a; border-radius:10px; padding:16px; text-align:center; margin-top:10px;">
+                    <div style="font-size:32px; margin-bottom:12px;">🔄</div>
+                    <h3 style="margin:0 0 10px 0; color:#cdd6f4;">Import Routines</h3>
+                    <p style="font-size:12px; color:#a6adc8; margin-bottom:16px; line-height:1.4;">
+                        You already have local routines saved.<br>How do you want to handle conflicts?
+                    </p>
+                    <button id="hcr-imp-overwrite" style="${btnStyle('#3d2030','#f38ba8',true)}; margin-bottom:8px; padding:10px;">⚠️ Overwrite local routines</button>
+                    <button id="hcr-imp-new" style="${btnStyle('#2a3a2a','#a6e3a1',true)}; margin-bottom:8px; padding:10px;">✨ Add only new routines</button>
+                    <button id="hcr-imp-cancel" style="${btnStyle('#313244','#cdd6f4',true)}; padding:10px;">✕ Cancel</button>
+                </div>
+            `;
+            document.getElementById('hcr-imp-overwrite').addEventListener('click', () => importRoutinesFromHevy('overwrite'));
+            document.getElementById('hcr-imp-new').addEventListener('click', () => importRoutinesFromHevy('newOnly'));
+            document.getElementById('hcr-imp-cancel').addEventListener('click', () => renderPanel());
+            return;
+        }
+
         const btn = document.getElementById('hcr-import-btn');
         if (btn) { btn.textContent = `⏳ Importing ${uuids.length}...`; btn.disabled = true; }
 
         let imported = 0;
+        let skipped = 0;
         for (const uuid of uuids) {
             try {
                 const res = await gmFetch(`https://api.hevyapp.com/routine/${uuid}`, { headers: getHeaders() });
@@ -352,19 +382,33 @@
                     }))
                 };
 
-                const existing = getSavedRoutines();
                 const idx = existing.findIndex(e =>
                     (e.hevy_id && e.hevy_id === routine.hevy_id) ||
                     (!e.hevy_id && e.name === routine.name)
                 );
-                if (idx >= 0) existing[idx] = routine; else existing.push(routine);
+
+                if (idx >= 0) {
+                    if (mode === 'newOnly') {
+                        skipped++;
+                        continue; // Skip matching
+                    } else {
+                        existing[idx] = routine; // Overwrite
+                    }
+                } else {
+                    existing.push(routine); // Add new
+                }
+
                 saveRoutines(existing);
+                syncCache.set(routine.hevy_id, true);
                 imported++;
                 console.log('[HCR] Imported:', routine.name);
             } catch(e) { console.log('[HCR] Import error:', uuid, e); }
         }
 
-        if (btn) { btn.textContent = `✅ Imported ${imported}`; btn.disabled = false; }
+        if (btn) {
+            btn.textContent = `✅ Imported ${imported}` + (skipped > 0 ? ` (${skipped} skipped)` : '');
+            btn.disabled = false;
+        }
         renderPanel();
     }
 
@@ -552,7 +596,7 @@
         if (isMobile()) document.getElementById('hcr-close')?.addEventListener('click', () => { isOpen = false; panel.style.display = 'none'; });
         document.getElementById('hcr-new').addEventListener('click', () => showEditor(null));
         document.getElementById('hcr-fetch-btn').addEventListener('click', autoFetchExercises);
-        document.getElementById('hcr-import-btn').addEventListener('click', importRoutinesFromHevy);
+        document.getElementById('hcr-import-btn').addEventListener('click', () => importRoutinesFromHevy('prompt'));
         document.getElementById('hcr-backup-btn').addEventListener('click', backupRoutines);
         document.getElementById('hcr-refresh-token-btn').addEventListener('click', () => {
             capturedToken = null; updateTokenStatus();
@@ -585,11 +629,68 @@
     }
 
     function routinesMatch(local, hevy) {
+        if (local.name !== hevy.title) return false;
+        if (!hevy.exercises) return local.exercises.length === 0;
         if (local.exercises.length !== hevy.exercises.length) return false;
-        return local.exercises.every((ex, i) =>
-            ex.template_id === hevy.exercises[i]?.template_id &&
-            ex.sets.length === hevy.exercises[i]?.sets.length
-        );
+        return local.exercises.every((ex, i) => {
+            const hEx = hevy.exercises[i];
+            if (!hEx || ex.template_id !== hEx.exercise_template_id) return false;
+            if (ex.sets.length !== hEx.sets.length) return false;
+            return ex.sets.every((s, j) => {
+                const hs = hEx.sets[j];
+                return s.weight_kg == hs.weight_kg &&
+                       s.reps == hs.reps &&
+                       s.duration_seconds == hs.duration_seconds &&
+                       s.distance_meters == hs.distance_meters;
+            });
+        });
+    }
+
+    async function checkSync(routine, idx) {
+        let el = document.getElementById(`hcr-sync-${idx}`);
+        if (!el || !capturedToken) return;
+
+        if (syncCache.has(routine.hevy_id)) {
+            updateSyncBadge(el, syncCache.get(routine.hevy_id));
+            return;
+        }
+
+        if (pendingChecks.has(routine.hevy_id)) return;
+        pendingChecks.add(routine.hevy_id);
+
+        try {
+            const res = await gmFetch(`https://api.hevyapp.com/routine/${routine.hevy_id}`, { headers: getHeaders() });
+            if (res.ok) {
+                const rd = res.json();
+                const hevyRoutine = rd.routine || rd;
+                const match = routinesMatch(routine, hevyRoutine);
+                syncCache.set(routine.hevy_id, match);
+                el = document.getElementById(`hcr-sync-${idx}`);
+                updateSyncBadge(el, match);
+            } else {
+                el = document.getElementById(`hcr-sync-${idx}`);
+                if (el) el.innerText = '⚠️ api err';
+            }
+        } catch(e) {
+            el = document.getElementById(`hcr-sync-${idx}`);
+            if (el) el.innerText = '⚠️ net err';
+        }
+        pendingChecks.delete(routine.hevy_id);
+    }
+
+    function updateSyncBadge(el, isSync) {
+        if (!el) return;
+        if (isSync) {
+            el.style.color = '#a6e3a1';
+            el.style.borderColor = '#405040';
+            el.style.background = '#1e2e2e';
+            el.innerText = '✅ in sync';
+        } else {
+            el.style.color = '#f38ba8';
+            el.style.borderColor = '#503030';
+            el.style.background = '#2e1e2e';
+            el.innerText = '⚠️ out of sync';
+        }
     }
 
     function exportExerciseDB() {
@@ -619,6 +720,8 @@
     // ── 10. Routine List ───────────────────────────────────────────
     function renderList(routines) {
         const list = document.getElementById('hcr-list');
+
+        const syncChecksToRun = [];
 
         // Build enriched list with sync status
         const enriched = routines.map((r, i) => {
@@ -656,6 +759,12 @@
                 ? `<span style="background:#2a2040;color:#cba6f7;border:1px solid #6c5f8a;border-radius:4px;padding:1px 5px;margin-left:4px">☁️ hevy</span>`
                 : `<span style="background:#252535;color:#585b70;border:1px solid #45475a;border-radius:4px;padding:1px 5px;margin-left:4px">💾 local</span>`;
 
+            let syncBadge = '';
+            if (isHevy) {
+                syncBadge = `<span id="hcr-sync-${r._idx}" style="background:#313244;color:#a6adc8;border:1px solid #45475a;border-radius:4px;padding:1px 5px;margin-left:4px;font-size:10px;display:inline-block">⏳ checking...</span>`;
+                syncChecksToRun.push(r);
+            }
+
             const syncBtn = isHevy
                 ? `<button data-load="${r._idx}" title="Sync to Hevy" style="${iconBtn('#1a3a2a','#a6e3a1')}">🔄</button>`
                 : `<button data-load="${r._idx}" title="Push to Hevy" style="${iconBtn('#e05a2b','white')}">➡️</button>`;
@@ -666,7 +775,7 @@
                         <div style="min-width:0;flex:1">
                             <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name}</div>
                             <div style="color:#6c7086;font-size:11px;margin-top:2px">
-                                ${r.exercises.length} exercises ${badge}
+                                ${r.exercises.length} exercises ${badge} ${syncBadge}
                             </div>
                         </div>
                         <div style="display:flex;gap:4px;flex-shrink:0">
@@ -687,6 +796,8 @@
             const rList = getSavedRoutines();
             if (confirm(`Delete "${rList[idx].name}"?`)) { rList.splice(idx, 1); saveRoutines(rList); renderPanel(); }
         }));
+
+        syncChecksToRun.forEach(r => checkSync(r, r._idx));
     }
 
     // ── 11. Text Editor ────────────────────────────────────────────
@@ -710,7 +821,7 @@
             const parsed = parseTextRoutine(document.getElementById('hcr-text-editor').value);
             const err = document.getElementById('hcr-textedit-err');
             if (!parsed?.exercises.length) { err.style.display='block'; err.textContent='No recognized exercises.'; return; }
-            if (routines[routineIndex].hevy_id) parsed.hevy_id = routines[routineIndex].hevy_id;
+            if (routines[routineIndex].hevy_id) { parsed.hevy_id = routines[routineIndex].hevy_id; syncCache.set(parsed.hevy_id, false); }
             if (routines[routineIndex].index !== undefined) parsed.index = routines[routineIndex].index;
             const rList = getSavedRoutines(); rList[routineIndex] = parsed;
             saveRoutines(rList); editor.style.display = 'none'; renderPanel();
@@ -757,7 +868,7 @@
         const rList = getSavedRoutines();
         const existing = editingIndex !== null ? rList[editingIndex] : null;
         const updated = { name: n, exercises: editingExercises };
-        if (existing?.hevy_id) updated.hevy_id = existing.hevy_id;
+        if (existing?.hevy_id) { updated.hevy_id = existing.hevy_id; syncCache.set(updated.hevy_id, false); }
         if (existing?.index !== undefined) updated.index = existing.index;
         if (editingIndex !== null) rList[editingIndex] = updated; else rList.push(updated);
         saveRoutines(rList);
