@@ -38,6 +38,7 @@
     let panel = null;
     let isOpen = false;
     let exerciseTemplates = [];
+    let activeTab = 'all';
 
     // Load exercise DB
     (function initDB() {
@@ -505,7 +506,7 @@
     function renderPanel() {
         panel.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-                <strong style="font-size:16px">📋 Hevy Routines</strong>
+                <strong style="font-size:16px">📋 Hevy Manager</strong>
                 <div style="display:flex;gap:6px;align-items:center">
                     <button id="hcr-new-text" style="${btnStyle('#45475a','#cdd6f4')}">📝 Text</button>
                     <button id="hcr-new" style="${btnStyle('#313244','#a6e3a1')}">+ New</button>
@@ -536,22 +537,26 @@
                 <button id="hcr-parse-btn" style="${btnStyle('#a6e3a1','#1e1e2e',true)}">⚡ Parse & Save</button>
             </div>
 
+            <div id="hcr-tabs" style="display:flex;gap:0;margin-bottom:10px;border-radius:8px;overflow:hidden;border:1px solid #45475a;">
+                <button data-tab="all"   style="${tabStyle('all')}">All</button>
+                <button data-tab="hevy"  style="${tabStyle('hevy')}">☁️ Hevy</button>
+                <button data-tab="local" style="${tabStyle('local')}">💾 Local</button>
+                <button data-tab="sync"  style="${tabStyle('sync')}">🔀 Sync</button>
+            </div>
+
             <div id="hcr-list"></div>
             <div id="hcr-editor" style="display:none"></div>
         `;
 
         // Bind events
-        if (isMobile()) document.getElementById('hcr-close')?.addEventListener('click', () => {
-            isOpen = false; panel.style.display = 'none';
-        });
+        if (isMobile()) document.getElementById('hcr-close')?.addEventListener('click', () => { isOpen = false; panel.style.display = 'none'; });
         document.getElementById('hcr-new').addEventListener('click', () => showEditor(null));
         document.getElementById('hcr-fetch-btn').addEventListener('click', autoFetchExercises);
         document.getElementById('hcr-import-btn').addEventListener('click', importRoutinesFromHevy);
         document.getElementById('hcr-backup-btn').addEventListener('click', backupRoutines);
         document.getElementById('hcr-refresh-token-btn').addEventListener('click', () => {
-            capturedToken = null;
-            updateTokenStatus();
-            alert('Token cleared. Reload the page or browse around to capture a new token.');
+            capturedToken = null; updateTokenStatus();
+            alert('Token cleared. Browse the site to re-capture.');
         });
         document.getElementById('hcr-export-btn').addEventListener('click', exportExerciseDB);
         document.getElementById('hcr-new-text').addEventListener('click', () => {
@@ -560,7 +565,31 @@
         });
         document.getElementById('hcr-parse-btn').addEventListener('click', parseAndSaveText);
 
+        document.querySelectorAll('[data-tab]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                activeTab = btn.dataset.tab;
+                renderPanel();
+            });
+        });
+
         renderList(getSavedRoutines());
+    }
+
+    function tabStyle(tab) {
+        const active = activeTab === tab;
+        return `flex:1;padding:7px 4px;font-size:11px;cursor:pointer;border:none;
+            background:${active ? '#45475a' : '#1e1e2e'};
+            color:${active ? '#cdd6f4' : '#6c7086'};
+            font-weight:${active ? '600' : '400'};
+            transition:background 0.15s;`;
+    }
+
+    function routinesMatch(local, hevy) {
+        if (local.exercises.length !== hevy.exercises.length) return false;
+        return local.exercises.every((ex, i) =>
+            ex.template_id === hevy.exercises[i]?.template_id &&
+            ex.sets.length === hevy.exercises[i]?.sets.length
+        );
     }
 
     function exportExerciseDB() {
@@ -590,38 +619,65 @@
     // ── 10. Routine List ───────────────────────────────────────────
     function renderList(routines) {
         const list = document.getElementById('hcr-list');
-        if (routines.length === 0) {
+
+        // Build enriched list with sync status
+        const enriched = routines.map((r, i) => {
+            let status = 'local';
+            if (r.hevy_id) status = 'hevy';
+            return { ...r, _idx: i, _status: status };
+        });
+
+        // Filter by tab
+        let filtered;
+        if (activeTab === 'hevy')       filtered = enriched.filter(r => r._status === 'hevy');
+        else if (activeTab === 'local') filtered = enriched.filter(r => r._status === 'local');
+        else if (activeTab === 'sync')  filtered = enriched.filter(r => r._status === 'hevy'); // hevy routines that could be synced
+        else                            filtered = enriched;
+
+        if (filtered.length === 0) {
+            const msgs = {
+                all:   ['📭', 'No saved routines.', 'Go to hevy.com/routines and click 🔄 Import Routines from Hevy'],
+                hevy:  ['☁️', 'No Hevy routines.', 'Import routines from hevy.com/routines'],
+                local: ['💾', 'No local-only routines.', 'All your routines are synced with Hevy'],
+                sync:  ['🔀', 'No Hevy routines to sync.', 'Import routines first'],
+            };
+            const [icon, title, sub] = msgs[activeTab];
             list.innerHTML = `
                 <div style="color:#6c7086;text-align:center;margin:20px 0;font-size:13px">
-                    <div style="font-size:28px;margin-bottom:8px">📭</div>
-                    No saved routines.<br>
-                    <span style="font-size:11px">Go to hevy.com/routines and click<br>🔄 Import Routines from Hevy</span>
+                    <div style="font-size:28px;margin-bottom:8px">${icon}</div>
+                    ${title}<br><span style="font-size:11px">${sub}</span>
                 </div>`;
             return;
         }
 
-        list.innerHTML = routines.map((r, i) => `
-            <div style="background:#313244;border-radius:10px;padding:10px 12px;margin-bottom:8px">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-                    <div style="min-width:0;flex:1">
-                        <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name}</div>
-                        <div style="color:#6c7086;font-size:11px;margin-top:2px">
-                            ${r.exercises.length} exercises
-                            ${r.hevy_id
-                                ? '<span style="background:#2a2040;color:#cba6f7;border:1px solid #6c5f8a;border-radius:4px;padding:1px 5px;margin-left:4px">hevy</span>'
-                                : '<span style="background:#252535;color:#585b70;border:1px solid #45475a;border-radius:4px;padding:1px 5px;margin-left:4px">local</span>'
-                            }
+        list.innerHTML = filtered.map(r => {
+            const isHevy = r._status === 'hevy';
+            const badge = isHevy
+                ? `<span style="background:#2a2040;color:#cba6f7;border:1px solid #6c5f8a;border-radius:4px;padding:1px 5px;margin-left:4px">☁️ hevy</span>`
+                : `<span style="background:#252535;color:#585b70;border:1px solid #45475a;border-radius:4px;padding:1px 5px;margin-left:4px">💾 local</span>`;
+
+            const syncBtn = isHevy
+                ? `<button data-load="${r._idx}" title="Sync to Hevy" style="${iconBtn('#1a3a2a','#a6e3a1')}">🔄</button>`
+                : `<button data-load="${r._idx}" title="Push to Hevy" style="${iconBtn('#e05a2b','white')}">➡️</button>`;
+
+            return `
+                <div style="background:#313244;border-radius:10px;padding:10px 12px;margin-bottom:8px">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+                        <div style="min-width:0;flex:1">
+                            <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name}</div>
+                            <div style="color:#6c7086;font-size:11px;margin-top:2px">
+                                ${r.exercises.length} exercises ${badge}
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:4px;flex-shrink:0">
+                            <button data-edit="${r._idx}" title="Edit (GUI)" style="${iconBtn('#45475a','#cdd6f4')}">✏️</button>
+                            <button data-textedit="${r._idx}" title="Edit (Text)" style="${iconBtn('#45475a','#89b4fa')}">📝</button>
+                            ${syncBtn}
+                            <button data-del="${r._idx}" title="Delete" style="${iconBtn('#3d2030','#f38ba8')}">🗑</button>
                         </div>
                     </div>
-                    <div style="display:flex;gap:4px;flex-shrink:0">
-                        <button data-edit="${i}" title="Edit (GUI)" style="${iconBtn('#45475a','#cdd6f4')}">✏️</button>
-                        <button data-textedit="${i}" title="Edit (Text)" style="${iconBtn('#45475a','#89b4fa')}">📝</button>
-                        <button data-load="${i}" title="${r.hevy_id ? 'Sync to Hevy' : 'Push to Hevy'}" style="${iconBtn('#e05a2b','white')}">${r.hevy_id ? '🔄' : '➡️'}</button>
-                        <button data-del="${i}" title="Delete" style="${iconBtn('#3d2030','#f38ba8')}">🗑</button>
-                    </div>
-                </div>
-            </div>
-        `).join('');
+                </div>`;
+        }).join('');
 
         list.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => showEditor(+b.dataset.edit)));
         list.querySelectorAll('[data-textedit]').forEach(b => b.addEventListener('click', () => showTextEditor(+b.dataset.textedit)));
